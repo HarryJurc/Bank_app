@@ -1,11 +1,9 @@
 import json
 import logging
-
-import pandas as pd
 from datetime import datetime
-from utils import get_greeting, process_transactions, get_operations_data, read_user_settings, get_exchange_rates, \
+
+from src.utils import get_greeting, get_operations_data, process_transactions, read_user_settings, get_exchange_rates, \
     get_stock_prices
-import os
 
 
 def main(date_str: str) -> str:
@@ -50,7 +48,7 @@ def main(date_str: str) -> str:
         "cards": cards_result,
         "top_transactions": top_transactions,
         "exchange_rates": exchange_rates,
-        "stocks": stocks
+        "stocks": stocks,
     }
 
     logging.info("Формирование итогового результата")
