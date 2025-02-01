@@ -1,11 +1,11 @@
 import json
+import logging
 import os
 
 import pandas as pd
-import logging
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFrame:
@@ -15,7 +15,7 @@ def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFra
 
     df = pd.read_excel(filepath)
     df.columns = df.columns.str.strip()
-    df["Дата операции"] = pd.to_datetime(df["Дата операции"], errors='coerce', dayfirst=True)
+    df["Дата операции"] = pd.to_datetime(df["Дата операции"], errors="coerce", dayfirst=True)
     return df
 
 
@@ -27,8 +27,10 @@ def search_transactions(query: str, filepath: str = "../data/operations.xlsx") -
         return json.dumps({"error": str(e)})
 
     # Фильтрация по запросу в описании или категории
-    df_filtered = df[(df["Описание"].str.contains(query, case=False, na=False)) | (
-        df["Категория"].str.contains(query, case=False, na=False))]
+    df_filtered = df[
+        (df["Описание"].str.contains(query, case=False, na=False))
+        | (df["Категория"].str.contains(query, case=False, na=False))
+    ]
 
     logging.info(f"Найдено транзакций: {len(df_filtered)}")
 
