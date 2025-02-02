@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime
 from typing import Any
-
+from dotenv import load_dotenv
 import pandas as pd
 import requests
 
@@ -57,18 +57,31 @@ def process_transactions(df: pd.DataFrame, start_date: datetime, end_date: datet
 
 
 def get_exchange_rates(currencies: list) -> dict:
+    """Получает курсы валют (USD и EUR к RUB) с exchangerates_data API от apilayer"""
+
+    # Загружаем переменные окружения внутри функции
+    load_dotenv()
     api_key_currency = os.getenv("API_KEY_CURRENCY")
-    url = f"https://openexchangerates.org/api/latest.json?app_id={api_key_currency}"
+
+    if not api_key_currency:
+        raise ValueError("API_KEY_CURRENCY не найден. Проверь .env!")
+
+    url = f"https://api.apilayer.com/exchangerates_data/latest?apikey={api_key_currency}"
+
     try:
         logging.info(f"Запрос курсов валют для: {currencies}")
         response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            raise ValueError(f"Ошибка API: {response.status_code}, {response.text}")
+
         data = response.json()
         logging.info(f"Ответ от API курса валют: {data}")
-        if "rates" not in data:
-            raise ValueError("Ключ 'rates' отсутствует в ответе API.")
+
+        if "rates" not in data or "RUB" not in data["rates"]:
+            raise ValueError("Ключ 'rates' отсутствует или нет RUB в ответе API.")
 
         usd_to_rub = data["rates"]["RUB"]
-        eur_to_rub = data["rates"]["RUB"] / data["rates"]["EUR"]
+        eur_to_rub = usd_to_rub / data["rates"]["EUR"]
 
         rates = {currency: None for currency in currencies}
         if "USD" in currencies:
@@ -84,25 +97,31 @@ def get_exchange_rates(currencies: list) -> dict:
 
 
 def get_stock_prices(stocks: list) -> dict:
-    stock_prices = {}
+    """ Получает цены акций с Alpha Vantage API (для внутридневных данных) """
+    load_dotenv()
     api_key = os.getenv("API_KEY_STOCK")
-    url = f"https://www.alphavantage.co/query?function=BATCH_STOCK_QUOTES&apikey={api_key}&symbols={','.join(stocks)}"
+    stock_prices = {}
+
     try:
-        logging.info(f"Запрос цены акций для: {stocks}")
-        response = requests.get(
-            url,
-            params={"function": "BATCH_STOCK_QUOTES", "symbols": ",".join(stocks), "apikey": api_key},
-            timeout=10,
-        )
-        data = response.json()
-        logging.info(f"Ответ от API цены акций: {data}")
         for stock in stocks:
-            stock_data = next((quote for quote in data["Stock Quotes"] if quote["1. symbol"] == stock), None)
-            if stock_data:
-                stock_prices[stock] = stock_data.get("2. price", None)
+            url = f"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={stock}&interval=5min&apikey={api_key}"
+            logging.info(f"Запрос данных для акций: {stock}")
+            response = requests.get(url, timeout=10)
+
+            if response.status_code != 200:
+                raise ValueError(f"Ошибка API: {response.status_code}, {response.text}")
+
+            data = response.json()
+            logging.info(f"Ответ от API для {stock}: {data}")
+
+            # Проверяем наличие данных
+            if "Time Series (5min)" in data:
+                latest_time = next(iter(data["Time Series (5min)"].keys()))
+                stock_prices[stock] = data["Time Series (5min)"][latest_time]["4. close"]
             else:
                 stock_prices[stock] = None
+
     except Exception as e:
-        logging.error(f"Ошибка при запросе цены акций для {stocks}: {e}")
-        stock_prices = {stock: None for stock in stocks}
+        logging.error(f"Ошибка при запросе данных для акций: {e}")
+
     return stock_prices
