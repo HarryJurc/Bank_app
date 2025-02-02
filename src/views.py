@@ -13,6 +13,8 @@ from src.utils import (
 
 
 def main(date_str: str) -> str:
+    """Основная функция, обрабатывающая операции и возвращающая данные в формате JSON."""
+
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
         logging.info(f"Парсинг даты: {dt}")

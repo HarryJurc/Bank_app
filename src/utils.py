@@ -12,6 +12,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def get_greeting(dt: datetime) -> str:
+    """Возвращает приветствие в зависимости от времени суток."""
+
     hour = dt.hour
     if 5 <= hour < 12:
         return "Доброе утро"
@@ -24,6 +26,8 @@ def get_greeting(dt: datetime) -> str:
 
 
 def read_user_settings(settings_path: str = "../user_settings.json") -> dict[str, Any]:
+    """Читает пользовательские настройки из указанного JSON файла."""
+
     logging.info(f"Чтение настроек из файла {settings_path}")
     if not os.path.exists(settings_path):
         raise FileNotFoundError(f"Файл настроек {settings_path} не найден.")
@@ -33,6 +37,8 @@ def read_user_settings(settings_path: str = "../user_settings.json") -> dict[str
 
 
 def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFrame:
+    """Читает данные операций из указанного файла Excel."""
+
     logging.info(f"Чтение данных из файла {filepath}")
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Файл данных {filepath} не найден.")
@@ -44,6 +50,8 @@ def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFra
 
 
 def process_transactions(df: pd.DataFrame, start_date: datetime, end_date: datetime) -> tuple:
+    """Обрабатывает транзакции, фильтруя их по указанному диапазону дат."""
+
     logging.info(f"Фильтрация транзакций с {start_date} по {end_date}")
     df_filtered = df[(df["Дата операции"] >= start_date) & (df["Дата операции"] <= end_date)]
 
@@ -97,7 +105,8 @@ def get_exchange_rates(currencies: list) -> dict:
 
 
 def get_stock_prices(stocks: list) -> dict:
-    """Получает цены акций с Alpha Vantage API (для внутридневных данных)"""
+    """Получает цены акций с Alpha Vantage API"""
+
     load_dotenv()
     api_key = os.getenv("API_KEY_STOCK")
     stock_prices = {}

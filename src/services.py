@@ -8,6 +8,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFrame:
+    """Читает данные операций из указанного файла Excel."""
+
     logging.info(f"Чтение данных из файла {filepath}")
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Файл данных {filepath} не найден.")
@@ -19,6 +21,8 @@ def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFra
 
 
 def search_transactions(query: str, filepath: str = "../data/operations.xlsx") -> str:
+    """Ищет транзакции по запросу в указанном файле Excel."""
+
     try:
         df = get_operations_data(filepath)
     except FileNotFoundError as e:

@@ -10,6 +10,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def save_report(filename: Optional[str] = None) -> Callable:
+    """Декоратор для сохранения отчета в JSON файл."""
+
     def decorator(func: Callable[..., pd.DataFrame]) -> Callable[..., pd.DataFrame]:
         def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame:
             result = func(*args, **kwargs)
@@ -28,6 +30,8 @@ def save_report(filename: Optional[str] = None) -> Callable:
 
 
 def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFrame:
+    """Читает данные операций из указанного файла Excel."""
+
     logging.info(f"Чтение данных из файла {filepath}")
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Файл данных {filepath} не найден.")
@@ -44,6 +48,8 @@ def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFra
 
 @save_report()
 def spending_by_category(transactions: pd.DataFrame, category: str, date: Optional[str] = None) -> pd.DataFrame:
+    """Фильтрует транзакции по категории и указанному диапазону дат."""
+
     if date:
         end_date = datetime.datetime.strptime(date, "%Y-%m-%d")
     else:
