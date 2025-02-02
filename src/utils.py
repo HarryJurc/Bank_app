@@ -3,9 +3,10 @@ import logging
 import os
 from datetime import datetime
 from typing import Any
-from dotenv import load_dotenv
+
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -29,6 +30,7 @@ def read_user_settings(settings_path: str = "../user_settings.json") -> dict[str
     with open(settings_path, "r", encoding="utf-8") as f:
         settings: dict[str, Any] = json.load(f)
         return settings
+
 
 def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFrame:
     logging.info(f"Чтение данных из файла {filepath}")
@@ -95,7 +97,7 @@ def get_exchange_rates(currencies: list) -> dict:
 
 
 def get_stock_prices(stocks: list) -> dict:
-    """ Получает цены акций с Alpha Vantage API (для внутридневных данных) """
+    """Получает цены акций с Alpha Vantage API (для внутридневных данных)"""
     load_dotenv()
     api_key = os.getenv("API_KEY_STOCK")
     stock_prices = {}

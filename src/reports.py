@@ -2,14 +2,14 @@ import datetime
 import json
 import logging
 import os
-from typing import Callable, Optional, Any, TextIO
+from typing import Any, Callable, Optional
 
 import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def save_report(filename: Optional[str] = None) -> Callable[[Callable[..., pd.DataFrame]], Callable[..., pd.DataFrame]]:
+def save_report(filename: Optional[str] = None) -> Callable:
     def decorator(func: Callable[..., pd.DataFrame]) -> Callable[..., pd.DataFrame]:
         def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame:
             result = func(*args, **kwargs)
@@ -18,10 +18,12 @@ def save_report(filename: Optional[str] = None) -> Callable[[Callable[..., pd.Da
                 file = filename
             else:
                 file = f"report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(file, 'w', encoding='utf-8') as f:
-                json.dump(result.to_dict(orient='records'), f, ensure_ascii=False, indent=2)
+            with open(file, "w", encoding="utf-8") as f:
+                json.dump(result.to_dict(orient="records"), f, ensure_ascii=False, indent=2)
             return result
+
         return wrapper
+
     return decorator
 
 

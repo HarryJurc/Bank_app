@@ -2,8 +2,14 @@ import json
 import logging
 from datetime import datetime
 
-from src.utils import get_greeting, get_operations_data, process_transactions, read_user_settings, get_exchange_rates, \
-    get_stock_prices
+from src.utils import (
+    get_exchange_rates,
+    get_greeting,
+    get_operations_data,
+    get_stock_prices,
+    process_transactions,
+    read_user_settings,
+)
 
 
 def main(date_str: str) -> str:
