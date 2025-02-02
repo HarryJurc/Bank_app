@@ -6,7 +6,6 @@ from typing import Callable, Optional, Any, TextIO
 
 import pandas as pd
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
@@ -14,7 +13,6 @@ def save_report(filename: Optional[str] = None) -> Callable[[Callable[..., pd.Da
     def decorator(func: Callable[..., pd.DataFrame]) -> Callable[..., pd.DataFrame]:
         def wrapper(*args: Any, **kwargs: Any) -> pd.DataFrame:
             result = func(*args, **kwargs)
-            # Преобразование столбца с датами в строковый формат
             result["Дата операции"] = result["Дата операции"].dt.strftime("%Y-%m-%d %H:%М:%С")
             if filename:
                 file = filename
@@ -64,15 +62,15 @@ def spending_by_category(transactions: pd.DataFrame, category: str, date: Option
     return filtered_transactions
 
 
-# Пример вызова функции
-if __name__ == "__main__":
-    try:
-        df = get_operations_data()
-    except FileNotFoundError as e:
-        logging.error(f"Ошибка: {e}")
-        exit(1)
-
-    category = "Супермаркеты"
-    date = "2021-12-31"
-    result_df = spending_by_category(df, category, date)
-    print(result_df)
+# # Пример вызова функции
+# if __name__ == "__main__":
+#     try:
+#         df = get_operations_data()
+#     except FileNotFoundError as e:
+#         logging.error(f"Ошибка: {e}")
+#         exit(1)
+#
+#     category = "Супермаркеты"
+#     date = "2021-12-31"
+#     result_df = spending_by_category(df, category, date)
+#     print(result_df)

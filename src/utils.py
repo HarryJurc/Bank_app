@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 import pandas as pd
 import requests
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
@@ -59,7 +58,6 @@ def process_transactions(df: pd.DataFrame, start_date: datetime, end_date: datet
 def get_exchange_rates(currencies: list) -> dict:
     """Получает курсы валют (USD и EUR к RUB) с exchangerates_data API от apilayer"""
 
-    # Загружаем переменные окружения внутри функции
     load_dotenv()
     api_key_currency = os.getenv("API_KEY_CURRENCY")
 
@@ -114,7 +112,6 @@ def get_stock_prices(stocks: list) -> dict:
             data = response.json()
             logging.info(f"Ответ от API для {stock}: {data}")
 
-            # Проверяем наличие данных
             if "Time Series (5min)" in data:
                 latest_time = next(iter(data["Time Series (5min)"].keys()))
                 stock_prices[stock] = data["Time Series (5min)"][latest_time]["4. close"]

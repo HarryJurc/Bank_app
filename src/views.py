@@ -10,7 +10,7 @@ def main(date_str: str) -> str:
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
         logging.info(f"Парсинг даты: {dt}")
-    except Exception:
+    except ValueError:
         return json.dumps({"error": "Неверный формат даты. Ожидается YYYY-MM-DD HH:MM:SS"})
 
     greeting = get_greeting(dt)
@@ -21,13 +21,10 @@ def main(date_str: str) -> str:
 
     try:
         df = get_operations_data()
+        cards_result, top_transactions = process_transactions(df, start_date, end_date)
     except FileNotFoundError as e:
         logging.error(f"Ошибка: {e}")
         return json.dumps({"error": str(e)})
-
-    cards_result, top_transactions = process_transactions(df, start_date, end_date)
-    logging.info(f"Данные по картам: {cards_result}")
-    logging.info(f"Топ-5 транзакций: {top_transactions}")
 
     try:
         settings = read_user_settings()
@@ -55,7 +52,7 @@ def main(date_str: str) -> str:
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-# Тестовый вызов
-if __name__ == "__main__":
-    input_date = "2020-01-31 15:30:00"
-    print(main(input_date))
+# # Тестовый вызов
+# if __name__ == "__main__":
+#     input_date = "2020-01-31 15:30:00"
+#     print(main(input_date))
