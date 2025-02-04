@@ -37,12 +37,20 @@ def get_operations_data(filepath: str = "../data/operations.xlsx") -> pd.DataFra
         raise FileNotFoundError(f"Файл данных {filepath} не найден.")
 
     df = pd.read_excel(filepath)
+
+    # Проверка на пустоту
+    if df.empty:
+        logging.warning(f"Файл {filepath} пустой. Возвращаем пустой DataFrame.")
+        return df
+
     df.columns = df.columns.str.strip()
     df["Дата операции"] = pd.to_datetime(df["Дата операции"], errors="coerce", dayfirst=True)
+
     logging.info(f"Загружено строк: {len(df)}")
     logging.info(f"Пример данных: {df.head()}")
     logging.info(f"Уникальные категории: {df['Категория'].unique()}")
     logging.info(f"Диапазон дат: от {df['Дата операции'].min()} до {df['Дата операции'].max()}")
+
     return df
 
 

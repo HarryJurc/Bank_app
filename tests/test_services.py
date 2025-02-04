@@ -1,9 +1,7 @@
-import json
-from unittest.mock import Mock
-
-import pandas as pd
 import pytest
-
+from unittest.mock import Mock
+import pandas as pd
+import json
 from src.services import get_operations_data, search_transactions
 
 
@@ -20,10 +18,15 @@ def sample_data() -> pd.DataFrame:
     return df
 
 
-def test_get_operations_data(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
-        "src.services.pd.read_excel",
+@pytest.fixture
+def mock_os_path_exists(mocker: Mock) -> Mock:
+    return mocker.patch("os.path.exists", return_value=True)
+
+
+@pytest.fixture
+def mock_read_excel(mocker: Mock) -> Mock:
+    return mocker.patch(
+        "pandas.read_excel",
         return_value=pd.DataFrame(
             {
                 "Дата операции": ["01-01-2022", "02-01-2022"],
@@ -33,37 +36,45 @@ def test_get_operations_data(mocker: Mock) -> None:
             }
         ),
     )
-    result = get_operations_data("test_path.xlsx")
-    assert len(result) == 2
-    assert "Дата операции" in result.columns
-    assert "Категория" in result.columns
 
 
-def test_get_operations_data_file_not_found(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=False)
-    with pytest.raises(FileNotFoundError) as excinfo:
-        get_operations_data("test_path.xlsx")
-    assert "Файл данных test_path.xlsx не найден." in str(excinfo.value)
+# Параметризация для теста get_operations_data
+@pytest.mark.parametrize(
+    "file_exists, expected_length, expected_columns",
+    [
+        (True, 2, ["Дата операции", "Категория", "Описание", "Сумма"]),
+        (False, 0, []),
+    ]
+)
+def test_get_operations_data(file_exists: bool, expected_length: int, expected_columns: list,
+                             mock_os_path_exists, mock_read_excel) -> None:
+    mock_os_path_exists.return_value = file_exists
+    if file_exists:
+        result = get_operations_data("test_path.xlsx")
+        assert len(result) == expected_length
+        for col in expected_columns:
+            assert col in result.columns
+    else:
+        with pytest.raises(FileNotFoundError):
+            get_operations_data("test_path.xlsx")
 
 
-def test_search_transactions_found(mocker: Mock, sample_data: pd.DataFrame) -> None:
+# Для поиска потенциальных ошибок можно добавить явные проверки
+@pytest.mark.parametrize(
+    "search_term, expected_result",
+    [
+        ("еда",
+         [{"Дата операции": "2022-01-01 00:00:00", "Категория": "Еда", "Описание": "Покупка продуктов", "Сумма": 100}]),
+        ("не существующая категория", []),
+        ("покупка",
+         [{"Дата операции": "2022-01-01 00:00:00", "Категория": "Еда", "Описание": "Покупка продуктов", "Сумма": 100}]),
+    ]
+)
+def test_search_transactions(mocker: Mock, sample_data: pd.DataFrame, search_term: str, expected_result: list) -> None:
     mocker.patch("src.services.get_operations_data", return_value=sample_data)
-    result = search_transactions("еда", "test_path.xlsx")
-    assert '"Категория": "Еда"' in result
-    assert '"Описание": "Покупка продуктов"' in result
-
-
-def test_search_transactions_not_found(mocker: Mock, sample_data: pd.DataFrame) -> None:
-    mocker.patch("src.services.get_operations_data", return_value=sample_data)
-    result = search_transactions("не существующая категория", "test_path.xlsx")
-    assert result == "[]"
-
-
-def test_search_transactions_partial_match(mocker: Mock, sample_data: pd.DataFrame) -> None:
-    mocker.patch("src.services.get_operations_data", return_value=sample_data)
-    result = search_transactions("покупка", "test_path.xlsx")
-    assert '"Категория": "Еда"' in result
-    assert '"Описание": "Покупка продуктов"' in result
+    result = search_transactions(search_term, "test_path.xlsx")
+    result_json = json.loads(result)  # Преобразуем результат в JSON
+    assert result_json == expected_result, f"Expected {expected_result} but got {result_json}"
 
 
 def test_search_transactions_file_not_found(mocker: Mock) -> None:

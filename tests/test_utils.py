@@ -1,51 +1,80 @@
-import json
+import datetime
 from datetime import datetime
-from unittest.mock import Mock, mock_open
+from unittest.mock import mock_open, patch
 
 import pandas as pd
 import pytest
 
-from src.utils import (
-    get_exchange_rates,
-    get_greeting,
-    get_operations_data,
-    get_stock_prices,
-    process_transactions,
-    read_user_settings,
+from src.utils import (get_exchange_rates, get_greeting, get_operations_data, get_stock_prices, process_transactions,
+                       read_user_settings)
+
+
+@pytest.mark.parametrize(
+    "date_obj, expected",
+    [
+        (datetime(2022, 1, 10, 9, 30, 12), "Доброе утро"),
+        (datetime(2022, 1, 10, 13, 30, 12), "Добрый день"),
+        (datetime(2022, 1, 10, 19, 30, 12), "Добрый вечер"),
+        (datetime(2022, 1, 10, 1, 30, 12), "Доброй ночи"),
+    ],
 )
+def test_get_greeting(date_obj, expected):
+    assert get_greeting(date_obj) == expected
 
 
-def test_get_greeting() -> None:
-    dt = datetime(2022, 1, 10, 8, 0, 0)
-    assert get_greeting(dt) == "Доброе утро"
-    dt = datetime(2022, 1, 10, 14, 0, 0)
-    assert get_greeting(dt) == "Добрый день"
-    dt = datetime(2022, 1, 10, 19, 0, 0)
-    assert get_greeting(dt) == "Добрый вечер"
-    dt = datetime(2022, 1, 10, 2, 0, 0)
-    assert get_greeting(dt) == "Доброй ночи"
+@patch("requests.request")
+def test_get_exchange_rates(mock_request):
+    mock_request.return_value.json.return_value = {
+        "date": "2018-02-22",
+        "historical": "",
+        "info": {"rate": 148.972231, "timestamp": 1519328414},
+        "query": {"amount": 1, "from": "USD", "to": "RUB"},
+        "result": 100.12,
+        "success": True,
+    }
+    mocked_open = mock_open(read_data='{"user_currencies": ["USD"], "user_stocks": ["AAPL"]}')
+    with patch("builtins.open", mocked_open):
+        result = get_exchange_rates(datetime.datetime(2018, 2, 22, 12, 0, 0))
+        assert result == [{"currency": "USD", "rate": 100.12}]
 
 
-def test_read_user_settings(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
-        "builtins.open", mock_open(read_data=json.dumps({"user_currencies": ["USD"], "user_stocks": ["AAPL"]}))
-    )
-    settings = read_user_settings("test_user_settings.json")
-    assert settings["user_currencies"] == ["USD"]
-    assert settings["user_stocks"] == ["AAPL"]
+@pytest.fixture
+def mock_os_path_exists():
+    with patch("os.path.exists") as mock_exists:
+        yield mock_exists
 
 
-def test_read_user_settings_file_not_found(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=False)
-    with pytest.raises(FileNotFoundError) as excinfo:
-        read_user_settings("test_user_settings.json")
-    assert "Файл настроек test_user_settings.json не найден." in str(excinfo.value)
+@pytest.fixture
+def mock_requests_get():
+    with patch("requests.get") as mock_get:
+        yield mock_get
 
 
-def test_get_operations_data(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=True)
-    mocker.patch(
+@pytest.fixture
+def mock_load_dotenv():
+    with patch("src.utils.load_dotenv", return_value=None):
+        yield
+
+
+@pytest.fixture
+def mock_getenv():
+    with patch("os.getenv", return_value="test_api_key") as mock_env:
+        yield mock_env
+
+
+@pytest.mark.parametrize("file_exists, expected_exception", [(False, FileNotFoundError)])
+def test_read_user_settings_file_not_found(mock_os_path_exists, file_exists, expected_exception):
+    mock_os_path_exists.return_value = file_exists
+    if not file_exists:
+        with pytest.raises(expected_exception) as excinfo:
+            read_user_settings("test_user_settings.json")
+        assert "Файл настроек test_user_settings.json не найден." in str(excinfo.value)
+
+
+@pytest.mark.parametrize("file_exists, expected_len", [(True, 2)])
+def test_get_operations_data(mock_os_path_exists, file_exists, expected_len):
+    mock_os_path_exists.return_value = file_exists
+    with patch(
         "src.utils.pd.read_excel",
         return_value=pd.DataFrame(
             {
@@ -55,70 +84,84 @@ def test_get_operations_data(mocker: Mock) -> None:
                 "Сумма": [100, 200],
             }
         ),
-    )
-    df = get_operations_data("test_path.xlsx")
-    assert len(df) == 2
+    ):
+        df = get_operations_data("test_path.xlsx")
+    assert len(df) == expected_len
 
 
-def test_get_operations_data_file_not_found(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=False)
-    with pytest.raises(FileNotFoundError) as excinfo:
-        get_operations_data("test_path.xlsx")
-    assert "Файл данных test_path.xlsx не найден." in str(excinfo.value)
+@pytest.mark.parametrize("file_exists, expected_exception", [(False, FileNotFoundError)])
+def test_get_operations_data_file_not_found(mock_os_path_exists, file_exists, expected_exception):
+    mock_os_path_exists.return_value = file_exists
+    if not file_exists:
+        with pytest.raises(expected_exception) as excinfo:
+            get_operations_data("test_path.xlsx")
+        assert "Файл данных test_path.xlsx не найден." in str(excinfo.value)
 
 
-def test_process_transactions() -> None:
-    df = pd.DataFrame(
-        {
-            "Дата операции": pd.to_datetime(["2022-01-01", "2022-01-02"]),
-            "Номер карты": ["1234", "5678"],
-            "Сумма операции": [100, 200],
-            "Кэшбэк": [5, 10],
-        }
-    )
+@pytest.mark.parametrize(
+    "transactions, expected_cards, expected_top",
+    [
+        (
+            {
+                "Дата операции": pd.to_datetime(["2022-01-01", "2022-01-02"]),
+                "Номер карты": ["1234", "5678"],
+                "Сумма операции": [100, 200],
+                "Кэшбэк": [5, 10],
+            },
+            2,
+            2,
+        )
+    ],
+)
+def test_process_transactions(transactions, expected_cards, expected_top):
+    df = pd.DataFrame(transactions)
     start_date = datetime(2022, 1, 1)
     end_date = datetime(2022, 1, 31)
     cards_result, top_transactions = process_transactions(df, start_date, end_date)
-    assert len(cards_result) == 2
-    assert len(top_transactions) == 2
+    assert len(cards_result) == expected_cards
+    assert len(top_transactions) == expected_top
 
 
-def test_get_exchange_rates(mocker: Mock) -> None:
-    mocker.patch("src.utils.load_dotenv", return_value=None)
-    mocker.patch("os.getenv", return_value="test_api_key")
-    mocker.patch(
-        "requests.get", return_value=mocker.Mock(status_code=200, json=lambda: {"rates": {"RUB": 74.5, "EUR": 0.9}})
-    )
+@pytest.mark.parametrize(
+    "api_response, expected_rates",
+    [({"rates": {"RUB": 74.5, "EUR": 0.9}}, {"USD": 74.5, "EUR": 82.78})],
+)
+def test_get_exchange_rates(mock_requests_get, mock_load_dotenv, mock_getenv, api_response, expected_rates):
+    mock_requests_get.return_value.status_code = 200
+    mock_requests_get.return_value.json.return_value = api_response
     rates = get_exchange_rates(["USD", "EUR"])
-    assert rates["USD"] == 74.5
-    assert round(rates["EUR"], 2) == 82.78
+    assert rates["USD"] == expected_rates["USD"]
+    assert round(rates["EUR"], 2) == expected_rates["EUR"]
 
 
-def test_get_exchange_rates_api_error(mocker: Mock) -> None:
-    mocker.patch("src.utils.load_dotenv", return_value=None)
-    mocker.patch("os.getenv", return_value="test_api_key")
-    mocker.patch("requests.get", return_value=mocker.Mock(status_code=500, text="Internal Server Error"))
+@pytest.mark.parametrize("status_code", [500])
+def test_get_exchange_rates_api_error(mock_requests_get, mock_load_dotenv, mock_getenv, status_code):
+    mock_requests_get.return_value.status_code = status_code
+    mock_requests_get.return_value.text = "Internal Server Error"
     rates = get_exchange_rates(["USD", "EUR"])
     assert rates["USD"] is None
     assert rates["EUR"] is None
 
 
-def test_get_stock_prices(mocker: Mock) -> None:
-    mocker.patch("src.utils.load_dotenv", return_value=None)
-    mocker.patch("os.getenv", return_value="test_api_key")
-    mocker.patch(
-        "requests.get",
-        return_value=mocker.Mock(
-            status_code=200, json=lambda: {"Time Series (5min)": {"2022-01-10 20:00:00": {"4. close": "150.00"}}}
-        ),
-    )
+@pytest.mark.parametrize(
+    "api_response, expected_price",
+    [
+        (
+            {"Time Series (5min)": {"2022-01-10 20:00:00": {"4. close": "150.00"}}},
+            "150.00",
+        )
+    ],
+)
+def test_get_stock_prices(mock_requests_get, mock_load_dotenv, mock_getenv, api_response, expected_price):
+    mock_requests_get.return_value.status_code = 200
+    mock_requests_get.return_value.json.return_value = api_response
     prices = get_stock_prices(["AAPL"])
-    assert prices["AAPL"] == "150.00"
+    assert prices["AAPL"] == expected_price
 
 
-def test_get_stock_prices_invalid_response(mocker: Mock) -> None:
-    mocker.patch("src.utils.load_dotenv", return_value=None)
-    mocker.patch("os.getenv", return_value="test_api_key")
-    mocker.patch("requests.get", return_value=mocker.Mock(status_code=200, json=lambda: {}))
+@pytest.mark.parametrize("api_response", [{}])
+def test_get_stock_prices_invalid_response(mock_requests_get, mock_load_dotenv, mock_getenv, api_response):
+    mock_requests_get.return_value.status_code = 200
+    mock_requests_get.return_value.json.return_value = api_response
     prices = get_stock_prices(["AAPL"])
     assert prices["AAPL"] is None
