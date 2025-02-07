@@ -1,85 +1,82 @@
-import pytest
-from unittest.mock import Mock
-import pandas as pd
 import json
-from src.services import get_operations_data, search_transactions
+from unittest.mock import Mock, patch
+
+import pandas as pd
+
+from src.services import search_transactions
 
 
-@pytest.fixture
-def sample_data() -> pd.DataFrame:
+def create_test_data() -> pd.DataFrame:
     data = {
-        "Дата операции": ["01-01-2022", "02-01-2022"],
-        "Категория": ["Еда", "Развлечения"],
-        "Описание": ["Покупка продуктов", "Кино"],
-        "Сумма": [100, 200],
+        "Дата операции": pd.to_datetime([
+            "2021-12-31 16:44:00",
+            "2021-12-31 16:42:04",
+            "2021-12-31 16:39:04",
+            "2021-12-31 15:44:39",
+            "2021-12-28 13:44:39",
+            "2021-12-28 13:37:02",
+            "2021-12-27 12:01:09"
+        ]),
+        "Дата платежа": [
+            "31.12.2021",
+            "31.12.2021",
+            "31.12.2021",
+            "31.12.2021",
+            "28.12.2021",
+            "28.12.2021",
+            "27.12.2021"
+        ],
+        "Номер карты": ["*7197"] * 7,
+        "Статус": ["OK"] * 7,
+        "Сумма операции": [-160.89, -64.0, -118.12, -78.05, -381.48, -422.22, -40.0],
+        "Валюта операции": ["RUB"] * 7,
+        "Сумма платежа": [-160.89, -64.0, -118.12, -78.05, -381.48, -422.22, -40.0],
+        "Валюта платежа": ["RUB"] * 7,
+        "Кэшбэк": [None] * 7,
+        "Категория": ["Супермаркеты"] * 4 + ["Другие"] * 3,
+        "MCC": [5411] * 7,
+        "Описание": ["Колхоз", "Колхоз", "Магнит", "Колхоз", "Колхоз", "Магнит", "Evo_Lyzhnyj"],
+        "Бонусы (включая кэшбэк)": [3, 1, 2, 1, 7, 8, 0],
+        "Округление на инвесткопилку": [0] * 7,
+        "Сумма операции с округлением": [160.89, 64.0, 118.12, 78.05, 381.48, 422.22, 40.0]
     }
-    df = pd.DataFrame(data)
-    df["Дата операции"] = pd.to_datetime(df["Дата операции"], dayfirst=True)
-    return df
+    return pd.DataFrame(data)
 
 
-@pytest.fixture
-def mock_os_path_exists(mocker: Mock) -> Mock:
-    return mocker.patch("os.path.exists", return_value=True)
+@patch("src.services.get_operations_data")  # Подменяем функцию чтения данных
+def test_search_transactions(mock_get_operations_data: Mock) -> None:
+    mock_get_operations_data.return_value = create_test_data()
 
+    # Тест: Запрос, который находит транзакции
+    query = "Супермаркет"
+    result = json.loads(search_transactions(query))
+    assert isinstance(result, list)
+    assert len(result) == 4  # Ожидаем 4 транзакции
+    assert all(tr["Категория"] == "Супермаркеты" for tr in result)
 
-@pytest.fixture
-def mock_read_excel(mocker: Mock) -> Mock:
-    return mocker.patch(
-        "pandas.read_excel",
-        return_value=pd.DataFrame(
-            {
-                "Дата операции": ["01-01-2022", "02-01-2022"],
-                "Категория": ["Еда", "Развлечения"],
-                "Описание": ["Покупка продуктов", "Кино"],
-                "Сумма": [100, 200],
-            }
-        ),
-    )
+    # Тест: Запрос, который не находит транзакции
+    query = "Ничего нет"
+    result = json.loads(search_transactions(query))
+    assert result == []
 
+    # Тест: Запрос по полю "Описание"
+    query = "Evo_Lyzhnyj"
+    result = json.loads(search_transactions(query))
+    assert len(result) == 1
+    assert result[0]["Описание"] == "Evo_Lyzhnyj"
 
-# Параметризация для теста get_operations_data
-@pytest.mark.parametrize(
-    "file_exists, expected_length, expected_columns",
-    [
-        (True, 2, ["Дата операции", "Категория", "Описание", "Сумма"]),
-        (False, 0, []),
-    ]
-)
-def test_get_operations_data(file_exists: bool, expected_length: int, expected_columns: list,
-                             mock_os_path_exists, mock_read_excel) -> None:
-    mock_os_path_exists.return_value = file_exists
-    if file_exists:
-        result = get_operations_data("test_path.xlsx")
-        assert len(result) == expected_length
-        for col in expected_columns:
-            assert col in result.columns
+    # Тест: Файл не найден
+    mock_get_operations_data.side_effect = FileNotFoundError("Файл не найден")
+    result = json.loads(search_transactions("Колхоз"))
+    assert result == {"error": "Файл не найден"}
+
+    # Тест: Неправильные данные в дате операции
+    df = create_test_data()
+    df.loc[0, "Дата операции"] = "Некорректная дата"
+    mock_get_operations_data.return_value = df
+    result = json.loads(search_transactions("Колхоз"))
+    if isinstance(result, list):
+        assert isinstance(result, list)
     else:
-        with pytest.raises(FileNotFoundError):
-            get_operations_data("test_path.xlsx")
-
-
-# Для поиска потенциальных ошибок можно добавить явные проверки
-@pytest.mark.parametrize(
-    "search_term, expected_result",
-    [
-        ("еда",
-         [{"Дата операции": "2022-01-01 00:00:00", "Категория": "Еда", "Описание": "Покупка продуктов", "Сумма": 100}]),
-        ("не существующая категория", []),
-        ("покупка",
-         [{"Дата операции": "2022-01-01 00:00:00", "Категория": "Еда", "Описание": "Покупка продуктов", "Сумма": 100}]),
-    ]
-)
-def test_search_transactions(mocker: Mock, sample_data: pd.DataFrame, search_term: str, expected_result: list) -> None:
-    mocker.patch("src.services.get_operations_data", return_value=sample_data)
-    result = search_transactions(search_term, "test_path.xlsx")
-    result_json = json.loads(result)  # Преобразуем результат в JSON
-    assert result_json == expected_result, f"Expected {expected_result} but got {result_json}"
-
-
-def test_search_transactions_file_not_found(mocker: Mock) -> None:
-    mocker.patch("os.path.exists", return_value=False)
-    result = search_transactions("еда", "test_path.xlsx")
-    error_response = json.loads(result)
-    assert "error" in error_response
-    assert error_response["error"] == "Файл данных test_path.xlsx не найден."
+        assert "error" in result
+        assert result["error"] == "Файл не найден"

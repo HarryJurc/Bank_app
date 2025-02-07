@@ -1,4 +1,3 @@
-from datetime import datetime
 from unittest.mock import patch, mock_open
 
 import pandas as pd
@@ -27,7 +26,7 @@ def mock_os_path_exists():
 @pytest.fixture
 def mock_read_excel():
     with patch("src.reports.pd.read_excel") as mock_excel:
-        def mock_read(filepath, *args, **kwargs):
+        def mock_read(filepath):
             if filepath == "empty.xlsx":
                 return pd.DataFrame()  # Пустой DataFrame
             return pd.DataFrame(
